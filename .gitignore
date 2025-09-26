@@ -30,3 +30,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+#local
+**/.env
+# 忽略所有 application-*.yml 文件
+application-*.yml
+
+# 不忽略 application-prod.yml 和 application-dev.yml
+!application-prod.yml
+!application-dev.yml

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>商城后台 - 完整测试流程</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f7f6; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"], input[type="number"] { width: 95%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-right: 10px;}
+        .status { margin-top: 20px; padding: 15px; border-radius: 5px; word-wrap: break-word; }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+        #app-container > div { margin-bottom: 40px; } /* 视图间距 */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>商城后台测试</h1>
+    <div id="auth-status"></div>
+    <button id="logout-btn" class="hidden">退出登录</button>
+    <hr>
+
+    <div id="app-container">
+        <!-- 视图一：登录/注册 (默认显示) -->
+        <div id="view-auth">
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <h2>用户登录</h2>
+                    <form id="login-form">
+                        <div class="form-group"><label>用户名:</label><input type="text" id="login-username" required></div>
+                        <div class="form-group"><label>密码:</label><input type="password" id="login-password" required></div>
+                        <button type="submit">登录</button>
+                    </form>
+                </div>
+                <div style="flex: 1;">
+                    <h2>用户注册</h2>
+                    <form id="register-form">
+                        <div class="form-group"><label>用户名:</label><input type="text" id="reg-username" required></div>
+                        <div class="form-group"><label>密码:</label><input type="password" id="reg-password" required></div>
+                        <button type="submit" style="background-color: #28a745;">注册</button>
+                    </form>
+                </div>
+            </div>
+            <div id="auth-message" class="status hidden"></div>
+        </div>
+
+        <!-- 视图二：商品创建 (登录后显示) -->
+        <div id="view-product-creation" class="hidden">
+            <!-- 这里可以粘贴之前那个完整的商品创建表单 -->
+            <h2>创建新商品</h2>
+            <!-- 为了简洁，这里只放一个按钮来模拟需要认证的请求 -->
+            <button id="test-protected-api-btn">测试需要认证的接口</button>
+            <div id="product-message" class="status hidden"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = 'http://localhost:8081'; // 确认你的后端端口
+
+    // --- DOM 元素 ---
+    const viewAuth = document.getElementById('view-auth');
+    const viewProductCreation = document.getElementById('view-product-creation');
+    const authStatusDiv = document.getElementById('auth-status');
+    const logoutBtn = document.getElementById('logout-btn');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const testProtectedApiBtn = document.getElementById('test-protected-api-btn');
+
+    // --- 核心逻辑 ---
+
+    // 封装的 API 请求函数 (会自动携带 Token)
+    async function apiFetch(endpoint, options = {}) {
+        const token = localStorage.getItem('authToken');
+        const headers = { 'Content-Type': 'application/json', ...options.headers };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const finalOptions = { ...options, headers };
+        if (options.body instanceof FormData) {
+            delete finalOptions.headers['Content-Type'];
+        }
+
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, finalOptions);
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || `HTTP 错误: ${response.status}`);
+        }
+        if (result.code !== 200) {
+            throw new Error(result.message || 'API 业务错误');
+        }
+        return result;
+    }
+
+    // 更新 UI 视图的函数
+    function updateView() {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            // 已登录
+            viewAuth.classList.add('hidden');
+            viewProductCreation.classList.remove('hidden');
+            authStatusDiv.innerHTML = `<p style="color: green;">状态: 已登录</p>`;
+            logoutBtn.classList.remove('hidden');
+        } else {
+            // 未登录
+            viewAuth.classList.remove('hidden');
+            viewProductCreation.classList.add('hidden');
+            authStatusDiv.innerHTML = `<p style="color: red;">状态: 未登录</p>`;
+            logoutBtn.classList.add('hidden');
+        }
+    }
+
+    // --- 事件监听 ---
+
+    // 注册表单提交
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('reg-username').value;
+        const password = document.getElementById('reg-password').value;
+        const statusEl = document.getElementById('auth-message');
+        try {
+            const result = await apiFetch('/api/user/registerUser', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            statusEl.className = 'status success';
+            statusEl.textContent = result.data || '注册成功！请登录。';
+        } catch (error) {
+            statusEl.className = 'status error';
+            statusEl.textContent = `注册失败: ${error.message}`;
+        }
+    });
+
+    // 登录表单提交
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        const statusEl = document.getElementById('auth-message');
+        try {
+            const result = await apiFetch('/api/auth/login', { // 确保登录 URL 正确
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            // 核心！将 Token 存入 localStorage
+            localStorage.setItem('authToken', result.data.token); // 假设你的 Result.data 是 { "token": "..." }
+            statusEl.className = 'status hidden';
+            updateView(); // 更新视图
+        } catch (error) {
+            statusEl.className = 'status error';
+            statusEl.textContent = `登录失败: ${error.message}`;
+        }
+    });
+
+    // 退出登录按钮
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('authToken');
+        updateView();
+    });
+
+    // 测试受保护接口的按钮
+    testProtectedApiBtn.addEventListener('click', async () => {
+        const statusEl = document.getElementById('product-message');
+        try {
+            // 假设你有一个需要认证的接口 /api/user/me
+            const result = await apiFetch('/api/user/me');
+            statusEl.className = 'status success';
+            statusEl.textContent = '成功访问受保护接口！返回数据: ' + JSON.stringify(result.data);
+        } catch (error) {
+            statusEl.className = 'status error';
+            statusEl.textContent = `访问失败: ${error.message}`;
+        }
+    });
+
+    // --- 初始化 ---
+    // 页面加载时，根据 localStorage 的状态决定显示哪个视图
+    document.addEventListener('DOMContentLoaded', updateView);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhousheng.mapper.ProductMapper">
+    <resultMap id="ProductVoResultMap" type="com.zhousheng.vo.ProductVo">
+        <id property="id" column="p_id"/>
+        <result property="spuNo" column="p_spu_no"/>
+        <result property="title" column="p_title"/>
+        <result property="mainImage" column="p_main_image"/>
+        <result property="status" column="p_status"/>
+        <!-- 关键：映射我们通过聚合查询出的 minPrice -->
+        <result property="minPrice" column="min_price"/>
+    </resultMap>
+
+
+    <select id="selectProductVoPage" resultMap="ProductVoResultMap">
+        SELECT
+        p.id AS p_id,
+        p.spu_no AS p_spu_no,
+        p.title AS p_title,
+        p.main_image AS p_main_image,
+        p.status AS p_status,
+        sku.min_price
+        <if test="query.keyword != null and query.keyword != ''">
+            , MATCH(p.title, p.spu_no) AGAINST (#{processedKeyword} IN BOOLEAN MODE) AS score
+        </if>
+        FROM
+        product p
+        LEFT JOIN (
+        SELECT spu_id, MIN(price) AS min_price
+        FROM product_sku
+        GROUP BY spu_id
+        ) AS sku ON p.id = sku.spu_id
+
+        <where>
+            <!-- 1. 如果 keyword 存在，则优先使用全文索引 -->
+            <if test="query.keyword != null and query.keyword != ''">
+                <bind name="processedKeyword" value="'+' + query.keyword.replaceAll(' ', ' +') + '*'"/>
+                AND MATCH(p.title, p.spu_no) AGAINST (#{processedKeyword} IN BOOLEAN MODE)
+            </if>
+        </where>
+        <choose>
+            <when test="query.keyword != null and query.keyword != ''">
+                ORDER BY score DESC, p.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY p.create_time DESC
+            </otherwise>
+        </choose>
+
+    </select>
+
+</mapper>

@@ -1,0 +1,49 @@
+<!-- resources/mapper/ProductSkuMapper.xml -->
+<!--这是AI写的，批量处理productSku-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhousheng.mapper.ProductSkuMapper">
+
+    <!-- 这里只放复杂SQL，比如我们的批量扣减 -->
+    <update id="batchDeductStock">
+        UPDATE product_sku
+        <trim prefix="SET stock = CASE" suffix="END">
+            <foreach collection="list" item="item" separator=" ">
+                WHEN id = #{item.skuId} THEN stock - #{item.quantity}
+            </foreach>
+        </trim>
+        WHERE id IN
+        <foreach collection="list" item="item" separator="," open="(" close=")">
+            #{item.skuId}
+        </foreach>
+        AND stock >=
+        <trim prefix="CASE" suffix="END">
+            <foreach collection="list" item="item" separator=" ">
+                WHEN id = #{item.skuId} THEN #{item.quantity}
+            </foreach>
+        </trim>
+    </update>
+
+    <insert id="batchInsertProductSkus" parameterType="java.util.List">
+        INSERT INTO product_sku
+        (spu_id, sku_no, title, price, stock, images, spec) -- 移除了自增和默认值的列
+        VALUES
+        <!--
+            collection: 指定要遍历的集合。这就是我们 @Param("skuDoList") 起作用的地方！
+            item:       在循环中，当前元素的别名。
+            separator:  在每两个元素之间插入的分隔符。
+        -->
+        <foreach collection="skuDoList" item="sku" separator=",">
+            (
+            #{sku.spuId},
+            #{sku.skuNo},
+            #{sku.title},
+            #{sku.price},
+            #{sku.stock},
+            #{sku.images},
+            #{sku.spec}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

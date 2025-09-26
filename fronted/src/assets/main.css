@@ -1,0 +1,36 @@
+/* src/assets/main.css */
+
+/*
+  1. 使用现代的 CSS Reset 来清除所有浏览器默认样式
+  (这是一个好习惯，但为了简单，我们先只重置 margin)
+*/
+body {
+  margin: 0;
+}
+
+
+/*
+  2. 确保根元素和 #app 容器能撑满整个屏幕高度
+  这是让子组件的 height: 100% 或 100vh 能正确工作的基础
+*/
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  /* 移除所有可能限制宽度的 grid, flex, padding, max-width 等布局样式 */
+}
+
+/*
+  3. (可选) 添加一些全局的字体和背景色设置
+*/
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f2f5;
+}
+
+/*
+  4. (可选) 清理 base.css
+  检查一下 main.css 是否导入了 base.css (@import './base.css');
+  如果有，也建议将 base.css 里的内容清空或删除。
+*/

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用户注册与登录测试</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; margin: 0; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { display: flex; gap: 40px; }
+        .card { width: 350px; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input[type="text"], input[type="password"] { width: 95%; padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+        input:focus { border-color: #007bff; outline: none; }
+        button { background-color: #007bff; color: white; width: 100%; padding: 12px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        #register-form button { background-color: #28a745; }
+        #register-form button:hover { background-color: #218838; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 5px; text-align: center; word-wrap: break-word; }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 注册卡片 -->
+    <div class="card">
+        <h2>用户注册</h2>
+        <form id="register-form">
+            <div class="form-group">
+                <label for="reg-username">用户名:</label>
+                <input type="text" id="reg-username" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-password">密码:</label>
+                <input type="password" id="reg-password" required>
+            </div>
+            <button type="submit">注册</button>
+        </form>
+        <div id="register-status" class="status hidden"></div>
+    </div>
+
+    <!-- 登录卡片 -->
+    <div class="card">
+        <h2>用户登录</h2>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="login-username">用户名:</label>
+                <input type="text" id="login-username" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">密码:</label>
+                <input type="password" id="login-password" required>
+            </div>
+            <button type="submit">登录</button>
+        </form>
+        <div id="login-status" class="status hidden"></div>
+        <div id="jwt-token-display" class="status success hidden"></div>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = 'http://localhost:8081'; // 请根据你的后端端口修改
+
+    // --- DOM 元素获取 ---
+    const registerForm = document.getElementById('register-form');
+    const loginForm = document.getElementById('login-form');
+
+    const regUsernameInput = document.getElementById('reg-username');
+    const regPasswordInput = document.getElementById('reg-password');
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+
+    const registerStatusDiv = document.getElementById('register-status');
+    const loginStatusDiv = document.getElementById('login-status');
+    const jwtTokenDisplayDiv = document.getElementById('jwt-token-display');
+
+    // --- 工具函数 ---
+    function showStatus(element, message, isError = false) {
+        element.textContent = message;
+        element.className = `status ${isError ? 'error' : 'success'}`;
+    }
+
+    async function apiFetch(endpoint, options) {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+        // 不论成功失败，都先解析 response body
+        const result = await response.json();
+
+        // Spring Security 认证失败时，默认可能返回 401/403，并且 body 不是我们自定义的 Result 格式
+        if (!response.ok) {
+            // 优先使用我们自定义的 Result 里的 message
+            const errorMessage = result.message || `HTTP 错误: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
+        // 检查我们自定义的业务 code
+        if (result.code !== 200) {
+            throw new Error(result.message || 'API 返回业务错误');
+        }
+        return result;
+    }
+
+    // --- 注册逻辑 ---
+    registerForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        loginStatusDiv.className = 'status hidden';
+        jwtTokenDisplayDiv.className = 'status success hidden';
+
+        const userRegisterDto = {
+            username: regUsernameInput.value,
+            password: regPasswordInput.value
+        };
+
+        try {
+            const result = await apiFetch('/api/user/registerUser', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(userRegisterDto)
+            });
+            showStatus(registerStatusDiv, result.data || '注册成功！'); // 后端 success("注册成功") data是字符串
+        } catch (error) {
+            showStatus(registerStatusDiv, `注册失败: ${error.message}`, true);
+        }
+    });
+
+    // --- 登录逻辑 ---
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        registerStatusDiv.className = 'status hidden';
+        jwtTokenDisplayDiv.className = 'status success hidden';
+
+        const userLoginDto = {
+            username: loginUsernameInput.value,
+            password: loginPasswordInput.value
+        };
+
+        try {
+            const result = await apiFetch('/api/user/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(userLoginDto)
+            });
+
+            showStatus(loginStatusDiv, '登录成功！');
+            jwtTokenDisplayDiv.textContent = `获取到的 JWT Token: \n\n${result.data}`;
+            jwtTokenDisplayDiv.className = 'status success';
+
+        } catch (error) {
+            showStatus(loginStatusDiv, `登录失败: ${error.message}`, true);
+        }
+    });
+
+</script>
+</body>
+</html>
